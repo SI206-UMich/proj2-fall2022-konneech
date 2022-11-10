@@ -1,9 +1,15 @@
+# Your name: Alex Chuang
+# Your student id: 47940411
+# Your email: alchuang@umich.edu
+# List who you have worked with on this project: Kevin Song, Alex Mah
+
 from xml.sax import parseString
 from bs4 import BeautifulSoup
 import re
 import os
 import csv
 import unittest
+import requests
 
 
 def get_listings_from_search_results(html_file):
@@ -25,7 +31,39 @@ def get_listings_from_search_results(html_file):
         ('Loft in Mission District', 210, '1944564'),  # example
     ]
     """
-    pass
+    list = []
+    file = open(html_file, 'r')
+    content = file.read()
+    soup = BeautifulSoup(content, 'html.parser')
+    file.close()
+    names = []
+    costs = []
+    ids = []
+    for tag in soup.find_all(attrs={"class" : "t1jojoys dir dir-ltr"}):
+        name = tag.text
+        names.append(name)
+ 
+    for tag in soup.find_all(attrs={"class" : "_tyxjp1"}):
+        cost = tag.text[1:]
+        costs.append(int(cost))
+       
+    for tag in soup.find_all(attrs={"itemprop" : "url"}):
+        url = tag["content"]
+        pattern = r"(\d+)"
+        id = re.findall(pattern, url)
+        ids.append(id[0])
+  
+    for i in range(len(names)):
+        tuple_list = []
+        tuple_list.append(names[i])
+        tuple_list.append(costs[i])
+        tuple_list.append(ids[i])
+        tup = tuple(tuple_list)
+        list.append(tup)
+ 
+   # print(list)
+    return list
+
 
 
 def get_listing_information(listing_id):
@@ -52,7 +90,46 @@ def get_listing_information(listing_id):
         number of bedrooms
     )
     """
-    pass
+    list2 = []
+    for filename in os.listdir("html_files/"):
+        match = re.search(listing_id, filename)
+        if match:
+            foundfile = filename
+    file = open("html_files/" + foundfile)
+    content = file.read()
+    soup = BeautifulSoup(content, 'html.parser')
+    file.close()
+ 
+    for tag in soup.find(attrs={"class" : "f19phm7j dir dir-ltr"}):
+        policy = tag.text
+        res = policy.split(':')[-1]
+        if (bool(re.search("[Pp]ending", res))):
+            list2.append("Pending")
+        elif (bool(re.search("needed", res))):
+            list2.append("Exempt")
+        else:
+            list2.append(res)
+ 
+    for tag in soup.find(attrs={"class" : "_14i3z6h"}):
+        placeType = tag.text
+        res = placeType.split(" ")[0]
+        if res == "Private":
+            list2.append("Private Room")
+        elif res == "Entire":
+            list2.append("Entire Room")
+        else:
+            list2.append("Shared Room")
+  
+    for tag in soup.find(attrs={"class" : "lgx66tx dir dir-ltr"}).find_all("span")[5]:
+        if tag == "Studio":
+            list2.append(1)
+        else:
+            numBeds = tag.split(" ")[0]
+            list2.append(int(numBeds))
+ 
+    rel_info = tuple(list2[1:])
+    # print(rel_info)
+    return rel_info
 
 
 def get_detailed_listing_database(html_file):
@@ -147,11 +224,38 @@ class TestCases(unittest.TestCase):
         # check that the variable you saved after calling the function is a list
         self.assertEqual(type(listings), list)
         # check that each item in the list is a tuple
-
+        for item in listings:
+            self.assertEqual(type(item), tuple)
+ 
         # check that the first title, cost, and listing id tuple is correct (open the search results html and find it)
-
+        file = open("html_files/mission_district_search_results.html", 'r')
+        content = file.read()
+        file.close()
+        soup = BeautifulSoup(content, 'html.parser')
+        s1 = soup.find(attrs={"class" : "t1jojoys dir dir-ltr"})
+        name = s1.text
+        s2 = soup.find(attrs={"class" : "_tyxjp1"})
+        cost = int(s2.text[1:])
+        s3 = soup.find(attrs={"itemprop" : "url"})
+        id = re.search("(\d+)", s3["content"])
+        self.assertEqual(listings[0][0], name)
+        self.assertEqual(listings[0][1], cost)
+        self.assertEqual(listings[0][2], id.group())
+ 
         # check that the last title is correct (open the search results html and find it)
-        pass
+        file = open("html_files/mission_district_search_results.html", 'r')
+        content = file.read()
+        file.close()
+        soup = BeautifulSoup(content, 'html.parser')
+        s1 = soup.find_all(attrs={"class" : "t1jojoys dir dir-ltr"})
+        name = s1.pop().text
+        s2 = soup.find_all(attrs={"class" : "_tyxjp1"})
+        cost = int(s2.pop().text[1:])
+        s3 = soup.find_all(attrs={"itemprop" : "url"})
+        id = re.search("(\d+)", s3.pop()["content"])
+        self.assertEqual(listings[-1][0], name)
+        self.assertEqual(listings[-1][1], cost)
+        self.assertEqual(listings[-1][2], id.group())
 
     def test_get_listing_information(self):
         html_list = ["1623609",
@@ -174,12 +278,13 @@ class TestCases(unittest.TestCase):
             # check that the third element in the tuple is an int
             self.assertEqual(type(listing_information[2]), int)
         # check that the first listing in the html_list has policy number 'STR-0001541'
-
+        self.assertEqual(listing_informations[0][0], "STR-0001541")
+ 
         # check that the last listing in the html_list is a "Private Room"
-
+        self.assertEqual(listing_informations[-1][1], "Private Room")
+ 
         # check that the third listing has one bedroom
-
-        pass
+        self.assertEqual(listing_informations[2][2], 1)
 
     def test_get_detailed_listing_database(self):
         # call get_detailed_listing_database on "html_files/mission_district_search_results.html"
